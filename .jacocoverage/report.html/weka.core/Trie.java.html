@@ -1,0 +1,888 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Trie.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCoverage analysis of project &quot;Weka-3.6.10&quot; (powered by JaCoCo from EclEmma)</a> &gt; <a href="index.source.html" class="el_package">weka.core</a> &gt; <span class="el_source">Trie.java</span></div><h1>Trie.java</h1><pre class="source lang-java linenums">/*
+ *    This program is free software; you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation; either version 2 of the License, or
+ *    (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with this program; if not, write to the Free Software
+ *    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
+
+/*
+ * Trie.java
+ * Copyright (C) 2007 University of Waikato, Hamilton, New Zealand
+ */
+
+package weka.core;
+
+import java.io.Serializable;
+import java.lang.reflect.Array;
+import java.util.Collection;
+import java.util.Enumeration;
+import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.Vector;
+
+import javax.swing.tree.DefaultMutableTreeNode;
+
+/**
+ * A class representing a Trie data structure for strings.
+ * See also &lt;a href=&quot;http://en.wikipedia.org/wiki/Trie&quot; target=&quot;_blank&quot;&gt;Trie&lt;/a&gt; 
+ * on WikiPedia.
+ * 
+ * @author  fracpete (fracpete at waikato dot ac dot nz)
+ * @version $Revision: 1.2 $
+ */
+public class Trie
+  implements Serializable, Cloneable, Collection&lt;String&gt;, RevisionHandler {
+
+  /** for serialization */
+  private static final long serialVersionUID = -5897980928817779048L;
+
+  /**
+   * Represents a node in the trie.
+   * 
+   * @author  fracpete (fracpete at waikato dot ac dot nz)
+   * @version $Revision: 1.2 $
+   */
+  public static class TrieNode
+    extends DefaultMutableTreeNode
+    implements RevisionHandler {
+    
+    /** for serialization */
+    private static final long serialVersionUID = -2252907099391881148L;
+    
+    /** the stop character */
+<span class="fc" id="L62">    public final static Character STOP = '\0';</span>
+
+    /** for fast access to the children */
+    protected Hashtable&lt;Character,TrieNode&gt; m_Children;
+    
+    /**
+     * initializes the node
+     * 
+     * @param c		the value of this node
+     */
+    public TrieNode(char c) {
+<span class="nc" id="L73">      this(new Character(c));</span>
+<span class="nc" id="L74">    }</span>
+    
+    /**
+     * initializes the node
+     * 
+     * @param c		the value of this node
+     */
+    public TrieNode(Character c) {
+<span class="fc" id="L82">      super(c);</span>
+      
+<span class="fc" id="L84">      m_Children = new Hashtable&lt;Character,TrieNode&gt;(100);</span>
+<span class="fc" id="L85">    }</span>
+    
+    /**
+     * returns the stored character
+     * 
+     * @return		the stored character
+     */
+    public Character getChar() {
+<span class="fc" id="L93">      return (Character) getUserObject();</span>
+    }
+    
+    /**
+     * sets the character this node represents
+     * 
+     * @param value	the character to store
+     */
+    public void setChar(Character value) {
+<span class="nc" id="L102">      setUserObject(value);</span>
+<span class="nc" id="L103">    }</span>
+
+    /**
+     * adds the given string to its children (creates children if necessary)
+     * 
+     * @param suffix	the suffix to add to its children
+     * @return		true if the add operation changed the structure
+     */
+    public boolean add(String suffix) {
+      boolean		result;
+      Character 	c;
+      String		newSuffix;
+      TrieNode		child;
+      
+<span class="fc" id="L117">      result    = false;</span>
+<span class="fc" id="L118">      c         = suffix.charAt(0);</span>
+<span class="fc" id="L119">      newSuffix = suffix.substring(1);</span>
+      
+      // find child and add if necessary
+<span class="fc" id="L122">      child = m_Children.get(c);</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">      if (child == null) {</span>
+<span class="fc" id="L124">	result = true;</span>
+<span class="fc" id="L125">	child = add(c);</span>
+      }
+      
+      // propagate remaining suffix
+<span class="fc bfc" id="L129" title="All 2 branches covered.">      if (newSuffix.length() &gt; 0)</span>
+<span class="pc bpc" id="L130" title="3 of 4 branches missed.">	result = child.add(newSuffix) || result;</span>
+      
+<span class="fc" id="L132">      return result;</span>
+    }
+    
+    /**
+     * adds the given charater to its children
+     * 
+     * @param c		the character to add
+     * @return		the generated child node
+     */
+    protected TrieNode add(Character c) {
+      TrieNode	child;
+      
+<span class="fc" id="L144">      child = new TrieNode(c);</span>
+<span class="fc" id="L145">      add(child);</span>
+<span class="fc" id="L146">      m_Children.put(c, child);</span>
+      
+<span class="fc" id="L148">      return child;</span>
+    }
+    
+    /**
+     * removes the given characted from its children
+     * 
+     * @param c		the character to remove
+     */
+    protected void remove(Character c) {
+      TrieNode	child;
+      
+<span class="fc" id="L159">      child = m_Children.get(c);</span>
+<span class="fc" id="L160">      remove(child);</span>
+<span class="fc" id="L161">      m_Children.remove(c);</span>
+<span class="fc" id="L162">    }</span>
+    
+    /**
+     * Removes a suffix from the trie.
+     * 
+     * @param suffix	the suffix to remove
+     * @return		true if this trie changed as a result of the call
+     */
+    public boolean remove(String suffix) {
+      boolean		result;
+      Character		c;
+      String		newSuffix;
+      TrieNode		child;
+      
+<span class="fc" id="L176">      c         = suffix.charAt(0);</span>
+<span class="fc" id="L177">      newSuffix = suffix.substring(1);</span>
+<span class="fc" id="L178">      child     = m_Children.get(c);</span>
+      
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">      if (child == null) {</span>
+<span class="nc" id="L181">	result = false;</span>
+      }
+<span class="fc bfc" id="L183" title="All 2 branches covered.">      else if (newSuffix.length() == 0) {</span>
+<span class="fc" id="L184">	remove(c);</span>
+<span class="fc" id="L185">	result = true;</span>
+      }
+      else {
+<span class="fc" id="L188">	result = child.remove(newSuffix);</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">	if (child.getChildCount() == 0)</span>
+<span class="fc" id="L190">	  remove(child.getChar());</span>
+      }
+      
+<span class="fc" id="L193">      return result;</span>
+    }
+
+    /**
+     * checks whether a suffix can be found in its children
+     * 
+     * @param suffix	the suffix to look for
+     * @return		true if suffix was found
+     */
+    public boolean contains(String suffix) {
+      boolean		result;
+      Character 	c;
+      String		newSuffix;
+      TrieNode		child;
+      
+<span class="fc" id="L208">      c         = suffix.charAt(0);</span>
+<span class="fc" id="L209">      newSuffix = suffix.substring(1);</span>
+<span class="fc" id="L210">      child     = m_Children.get(c);</span>
+      
+<span class="fc bfc" id="L212" title="All 2 branches covered.">      if (child == null)</span>
+<span class="fc" id="L213">	result = false;</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">      else if (newSuffix.length() == 0)</span>
+<span class="fc" id="L215">	result = true;</span>
+      else
+<span class="fc" id="L217">	result = child.contains(newSuffix);</span>
+
+<span class="fc" id="L219">      return result;</span>
+    }
+    
+    /**
+     * creates a deep copy of itself
+     * 
+     * @return		a deep copy of itself
+     */
+    public Object clone() {
+      TrieNode			result;
+      Enumeration&lt;Character&gt;	keys;
+      Character			key;
+      TrieNode			child;
+      
+<span class="fc" id="L233">      result = new TrieNode(getChar());</span>
+<span class="fc" id="L234">      keys   = m_Children.keys();</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">      while (keys.hasMoreElements()) {</span>
+<span class="fc" id="L236">	key   = keys.nextElement();</span>
+<span class="fc" id="L237">	child = (TrieNode) m_Children.get(key).clone();</span>
+<span class="fc" id="L238">	result.add(child);</span>
+<span class="fc" id="L239">	result.m_Children.put(key, child);</span>
+      }
+      
+<span class="fc" id="L242">      return result;</span>
+    }
+    
+    /**
+     * Indicates whether some other object is &quot;equal to&quot; this one.
+     * 
+     * @param obj	the object to check for equality
+     * @return		true if equal
+     */
+    public boolean equals(Object obj) {
+      boolean			result;
+      TrieNode 			node;
+      Enumeration&lt;Character&gt;	keys;
+      Character			key;
+      
+<span class="fc" id="L257">      node   = (TrieNode) obj;</span>
+      
+      // is payload the same?
+<span class="fc bfc" id="L260" title="All 2 branches covered.">      if (getChar() == null)</span>
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">	result = (node.getChar() == null);</span>
+      else
+<span class="fc" id="L263">	result = getChar().equals(node.getChar());</span>
+      
+      // check children
+<span class="fc bfc" id="L266" title="All 2 branches covered.">      if (result) {</span>
+<span class="fc" id="L267">	keys = m_Children.keys();</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">	while (keys.hasMoreElements()) {</span>
+<span class="fc" id="L269">	  key    = keys.nextElement();</span>
+<span class="fc" id="L270">	  result = m_Children.get(key).equals(node.m_Children.get(key));</span>
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">	  if (!result)</span>
+<span class="nc" id="L272">	    break;</span>
+	}
+      }
+      
+<span class="fc" id="L276">      return result;</span>
+    }
+
+    /**
+     * returns the node with the given suffix
+     * 
+     * @param suffix	the suffix to look for
+     * @return		null if unsuccessful otherwise the corresponding node
+     */
+    public TrieNode find(String suffix) {
+      TrieNode		result;
+      Character 	c;
+      String		newSuffix;
+      TrieNode		child;
+      
+<span class="fc" id="L291">      c         = suffix.charAt(0);</span>
+<span class="fc" id="L292">      newSuffix = suffix.substring(1);</span>
+<span class="fc" id="L293">      child     = m_Children.get(c);</span>
+      
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">      if (child == null)</span>
+<span class="nc" id="L296">	result = null;</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">      else if (newSuffix.length() == 0)</span>
+<span class="fc" id="L298">	result = child;</span>
+      else
+<span class="fc" id="L300">	result = child.find(newSuffix);</span>
+
+<span class="fc" id="L302">      return result;</span>
+    }
+
+    /**
+     * returns the common prefix for all the nodes starting with this node.
+     * The result includes this node, unless it's the root node or a STOP node.
+     * 
+     * @return			the result of the search
+     */
+    public String getCommonPrefix() {
+<span class="fc" id="L312">      return getCommonPrefix(&quot;&quot;);</span>
+    }
+
+    /**
+     * returns the common prefix for all the nodes starting with the node
+     * for the specified prefix. Can be null if initial prefix is not found.
+     * The result includes this node, unless it's the root node or a STOP node.
+     * Using the empty string means starting with this node.
+     * 
+     * @param startPrefix	the prefix of the node to start the search from
+     * @return			the result of the search, null if startPrefix
+     * 				cannot be found
+     */
+    public String getCommonPrefix(String startPrefix) {
+      String	result;
+      TrieNode	startNode;
+
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">      if (startPrefix.length() == 0)</span>
+<span class="fc" id="L330">	startNode = this;</span>
+      else
+<span class="nc" id="L332">	startNode = find(startPrefix);</span>
+      
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">      if (startNode == null)</span>
+<span class="nc" id="L335">	result = null;</span>
+      else
+<span class="fc" id="L337">	result = startPrefix + startNode.determineCommonPrefix(&quot;&quot;);</span>
+	
+<span class="fc" id="L339">      return result;</span>
+    }
+
+    /**
+     * determines the common prefix of the nodes.
+     * 
+     * @param currentPrefix	the common prefix found so far
+     * @return			the result of the search
+     */
+    protected String determineCommonPrefix(String currentPrefix) {
+      String	result;
+      String	newPrefix;
+      
+<span class="pc bpc" id="L352" title="1 of 4 branches missed.">      if (!isRoot() &amp;&amp; (getChar() != STOP))</span>
+<span class="fc" id="L353">	newPrefix = currentPrefix + getChar();</span>
+      else
+<span class="fc" id="L355">	newPrefix = currentPrefix;</span>
+      
+<span class="fc bfc" id="L357" title="All 2 branches covered.">      if (m_Children.size() == 1)</span>
+<span class="fc" id="L358">	result = ((TrieNode) getChildAt(0)).determineCommonPrefix(newPrefix);</span>
+      else
+<span class="fc" id="L360">	result = newPrefix;</span>
+      
+<span class="fc" id="L362">      return result;</span>
+    }
+    
+    /**
+     * returns the number of stored strings, i.e., leaves
+     * 
+     * @return		the number of stored strings
+     */
+    public int size() {
+      int	result;
+      TrieNode	leaf;
+      
+<span class="fc" id="L374">      result = 0;</span>
+<span class="fc" id="L375">      leaf   = (TrieNode) getFirstLeaf();</span>
+<span class="fc bfc" id="L376" title="All 2 branches covered.">      while (leaf != null) {</span>
+<span class="fc bfc" id="L377" title="All 2 branches covered.">	if (leaf != getRoot())</span>
+<span class="fc" id="L378">	  result++;</span>
+<span class="fc" id="L379">	leaf = (TrieNode) leaf.getNextLeaf();</span>
+      }
+      
+<span class="fc" id="L382">      return result;</span>
+    }
+    
+    /**
+     * returns the full string up to the root
+     * 
+     * @return		the full string to the root
+     */
+    public String getString() {
+      char[]	result;
+      TrieNode	node;
+      
+<span class="fc" id="L394">      result = new char[this.getLevel()];</span>
+<span class="fc" id="L395">      node   = this;</span>
+<span class="fc bfc" id="L396" title="All 2 branches covered.">      while (node.getParent() != null) {</span>
+<span class="pc bpc" id="L397" title="1 of 2 branches missed.">	if (node.isRoot())</span>
+<span class="nc" id="L398">	  break;</span>
+	else
+<span class="fc" id="L400">	  result[node.getLevel() - 1] = node.getChar();</span>
+<span class="fc" id="L401">	node = (TrieNode) node.getParent();</span>
+      }
+      
+<span class="fc" id="L404">      return new String(result);</span>
+    }
+    
+    /**
+     * returns the node in a string representation
+     * 
+     * @return		the node as string
+     */
+    public String toString() {
+<span class="nc" id="L413">      return &quot;&quot; + getChar();</span>
+    }
+    
+    /**
+     * Returns the revision string.
+     * 
+     * @return		the revision
+     */
+    public String getRevision() {
+<span class="nc" id="L422">      return RevisionUtils.extract(&quot;$Revision: 1.2 $&quot;);</span>
+    }
+  }
+  
+  /**
+   * Represents an iterator over a trie
+   * 
+   * @author  fracpete (fracpete at waikato dot ac dot nz)
+   * @version $Revision: 1.2 $
+   */
+  public static class TrieIterator 
+    implements Iterator&lt;String&gt;, RevisionHandler {
+    
+    /** the node to use as root */
+    protected TrieNode m_Root;
+    
+    /** the last leaf for this root node */
+    protected TrieNode m_LastLeaf;
+    
+    /** the current leaf node */
+    protected TrieNode m_CurrentLeaf;
+    
+    /**
+     * initializes the iterator
+     * 
+     * @param node		the node to use as root
+     */
+    public TrieIterator(TrieNode node) {
+<span class="fc" id="L450">      super();</span>
+      
+<span class="fc" id="L452">      m_Root        = node;</span>
+<span class="fc" id="L453">      m_CurrentLeaf = (TrieNode) m_Root.getFirstLeaf();</span>
+<span class="fc" id="L454">      m_LastLeaf    = (TrieNode) m_Root.getLastLeaf();</span>
+<span class="fc" id="L455">    }</span>
+    
+    /**
+     * Returns true if the iteration has more elements.
+     * 
+     * @return		true if there is at least one more element
+     */
+    public boolean hasNext() {
+<span class="fc bfc" id="L463" title="All 2 branches covered.">      return (m_CurrentLeaf != null);</span>
+    }
+    
+    /**
+     * Returns the next element in the iteration.
+     * 
+     * @return		the next element
+     */
+    public String next() {
+      String	result;
+      
+<span class="fc" id="L474">      result        = m_CurrentLeaf.getString();</span>
+<span class="fc" id="L475">      result        = result.substring(0, result.length() - 1);  // remove STOP</span>
+<span class="fc bfc" id="L476" title="All 2 branches covered.">      if (m_CurrentLeaf != m_LastLeaf)</span>
+<span class="fc" id="L477">	m_CurrentLeaf = (TrieNode) m_CurrentLeaf.getNextLeaf();</span>
+      else
+<span class="fc" id="L479">	m_CurrentLeaf = null;</span>
+      
+<span class="fc" id="L481">      return result;</span>
+    }
+    
+    /**
+     * ignored
+     */
+    public void remove() {
+<span class="nc" id="L488">    }</span>
+    
+    /**
+     * Returns the revision string.
+     * 
+     * @return		the revision
+     */
+    public String getRevision() {
+<span class="nc" id="L496">      return RevisionUtils.extract(&quot;$Revision: 1.2 $&quot;);</span>
+    }
+  }
+  
+  /** the root node */
+  protected TrieNode m_Root;
+
+  /** the hash code */
+  protected int m_HashCode;
+  
+  /** whether the structure got modified and the hash code needs to be 
+   * re-calculated */
+  protected boolean m_RecalcHashCode;
+  
+  /**
+   * initializes the data structure
+   */
+  public Trie() {
+<span class="fc" id="L514">    super();</span>
+    
+<span class="fc" id="L516">    m_Root           = new TrieNode(null);</span>
+<span class="fc" id="L517">    m_RecalcHashCode = true;</span>
+<span class="fc" id="L518">  }</span>
+  
+  /**
+   * Ensures that this collection contains the specified element.
+   * 
+   * @param o		the string to add
+   * @return		true if the structure changed
+   */
+  public boolean add(String o) {
+<span class="fc" id="L527">    return m_Root.add(o + TrieNode.STOP);</span>
+  }
+  
+  /**
+   * Adds all of the elements in the specified collection to this collection 
+   * 
+   * @param c		the collection to add
+   */
+  public boolean addAll(Collection&lt;? extends String&gt; c) {
+    boolean		result;
+    Iterator&lt;String&gt;	iter;
+    
+<span class="nc" id="L539">    result = false;</span>
+    
+<span class="nc" id="L541">    iter = (Iterator&lt;String&gt;) c.iterator();</span>
+<span class="nc bnc" id="L542" title="All 2 branches missed.">    while (iter.hasNext())</span>
+<span class="nc bnc" id="L543" title="All 4 branches missed.">      result = add(iter.next()) || result;</span>
+    
+<span class="nc" id="L545">    return result;</span>
+  }
+  
+  /**
+   * Removes all of the elements from this collection
+   */
+  public void clear() {
+<span class="nc" id="L552">    m_Root.removeAllChildren();</span>
+<span class="nc" id="L553">    m_RecalcHashCode = true;</span>
+<span class="nc" id="L554">  }</span>
+
+  /**
+   * returns a deep copy of itself
+   * 
+   * @return		a copy of itself
+   */
+  public Object clone() {
+    Trie	result;
+    
+<span class="fc" id="L564">    result = new Trie();</span>
+<span class="fc" id="L565">    result.m_Root = (TrieNode) m_Root.clone();</span>
+    
+<span class="fc" id="L567">    return result;</span>
+  }
+  
+  /**
+   * Returns true if this collection contains the specified element.
+   * 
+   * @param o		the object to check for in trie
+   * @return		true if found
+   */
+  public boolean contains(Object o) {
+<span class="fc" id="L577">    return m_Root.contains(((String) o) + TrieNode.STOP);</span>
+  }
+  
+  /**
+   * Returns true if this collection contains all of the elements in the 
+   * specified collection.
+   * 
+   * @param c		the collection to look for in the trie
+   * @return		true if all elements were found
+   */
+  public boolean containsAll(Collection&lt;?&gt; c) {
+    boolean	result;
+    Iterator	iter;
+    
+<span class="nc" id="L591">    result = true;</span>
+    
+<span class="nc" id="L593">    iter = c.iterator();</span>
+<span class="nc bnc" id="L594" title="All 2 branches missed.">    while (iter.hasNext()) {</span>
+<span class="nc bnc" id="L595" title="All 2 branches missed.">      if (!contains(iter.next())) {</span>
+<span class="nc" id="L596">	result = false;</span>
+<span class="nc" id="L597">	break;</span>
+      }
+    }
+    
+<span class="nc" id="L601">    return result;</span>
+  }
+  
+  /**
+   * checks whether the given prefix is stored in the trie
+   * 
+   * @param prefix	the prefix to check
+   * @return		true if the prefix is part of the trie
+   */
+  public boolean containsPrefix(String prefix) {
+<span class="fc" id="L611">    return m_Root.contains(prefix);</span>
+  }
+  
+  /**
+   * Compares the specified object with this collection for equality.
+   * 
+   * @param o		the object to check for equality
+   */
+  public boolean equals(Object o) {
+<span class="fc" id="L620">    return m_Root.equals(((Trie) o).getRoot());</span>
+  }
+
+  /**
+   * returns the common prefix for all the nodes
+   * 
+   * @return		the result of the search
+   */
+  public String getCommonPrefix() {
+<span class="fc" id="L629">    return m_Root.getCommonPrefix();</span>
+  }
+
+  /**
+   * returns the root node of the trie
+   * 
+   * @return		the root node
+   */
+  public TrieNode getRoot() {
+<span class="fc" id="L638">    return m_Root;</span>
+  }
+
+  /**
+   * returns all stored strings that match the given prefix
+   * 
+   * @param prefix	the prefix that all strings must have
+   * @return		all strings that match the prefix
+   */
+  public Vector&lt;String&gt; getWithPrefix(String prefix) {
+    Vector&lt;String&gt;	result;
+    TrieNode		node;
+    TrieIterator	iter;
+    
+<span class="fc" id="L652">    result = new Vector&lt;String&gt;();</span>
+    
+<span class="fc bfc" id="L654" title="All 2 branches covered.">    if (containsPrefix(prefix)) {</span>
+<span class="fc" id="L655">      node = m_Root.find(prefix);</span>
+<span class="fc" id="L656">      iter = new TrieIterator(node);</span>
+<span class="fc bfc" id="L657" title="All 2 branches covered.">      while (iter.hasNext())</span>
+<span class="fc" id="L658">	result.add(iter.next());</span>
+    }
+    
+<span class="fc" id="L661">    return result;</span>
+  }
+  
+  /**
+   * Returns the hash code value for this collection.
+   * 
+   * @return		the hash code
+   */
+  public int hashCode() {
+<span class="nc bnc" id="L670" title="All 2 branches missed.">    if (m_RecalcHashCode) {</span>
+<span class="nc" id="L671">      m_HashCode       = toString().hashCode();</span>
+<span class="nc" id="L672">      m_RecalcHashCode = false;</span>
+    }
+    
+<span class="nc" id="L675">    return m_HashCode;</span>
+  }
+  
+  /**
+   * Returns true if this collection contains no elements.
+   * 
+   * @return		true if empty
+   */
+  public boolean isEmpty() {
+<span class="nc bnc" id="L684" title="All 2 branches missed.">    return (m_Root.getChildCount() == 0);</span>
+  }
+
+  /**
+   * Returns an iterator over the elements in this collection.
+   * 
+   * @return		returns an iterator over all the stored strings
+   */
+  public Iterator&lt;String&gt; iterator() {
+<span class="fc" id="L693">    return new TrieIterator(m_Root);</span>
+  }
+  
+  /**
+   * Removes a single instance of the specified element from this collection, 
+   * if it is present.
+   * 
+   * @param o		the object to remove
+   * @return		true if this collection changed as a result of the call
+   */
+  public boolean remove(Object o) {
+    boolean	result;
+    
+<span class="fc" id="L706">    result = m_Root.remove(((String) o) + TrieNode.STOP);</span>
+    
+<span class="fc" id="L708">    m_RecalcHashCode = result;</span>
+    
+<span class="fc" id="L710">    return result;</span>
+  }
+  
+  /**
+   * Removes all this collection's elements that are also contained in the 
+   * specified collection
+   * 
+   * @param c		the collection to remove
+   * @return		true if the collection changed
+   */
+  public boolean removeAll(Collection&lt;?&gt; c) {
+    boolean	result;
+    Iterator	iter;
+    
+<span class="fc" id="L724">    result = false;</span>
+    
+<span class="fc" id="L726">    iter = c.iterator();</span>
+<span class="fc bfc" id="L727" title="All 2 branches covered.">    while (iter.hasNext()) {</span>
+<span class="pc bpc" id="L728" title="3 of 4 branches missed.">      result = remove(iter.next()) || result;</span>
+    }
+    
+<span class="fc" id="L731">    m_RecalcHashCode = result;</span>
+    
+<span class="fc" id="L733">    return result;</span>
+  }
+  
+  /**
+   * Retains only the elements in this collection that are contained in 
+   * the specified collection
+   * 
+   * @param c		the collection to use as reference
+   * @return		true if this collection changed as a result of the call
+   */
+  public boolean retainAll(Collection&lt;?&gt; c) {
+    boolean	result;
+    Iterator	iter;
+    Object	o;
+    
+<span class="fc" id="L748">    result = false;</span>
+<span class="fc" id="L749">    iter   = iterator();</span>
+<span class="fc bfc" id="L750" title="All 2 branches covered.">    while (iter.hasNext()) {</span>
+<span class="fc" id="L751">      o = iter.next();</span>
+<span class="fc bfc" id="L752" title="All 2 branches covered.">      if (!c.contains(o))</span>
+<span class="pc bpc" id="L753" title="3 of 4 branches missed.">	result = remove(o) || result;</span>
+    }
+    
+<span class="fc" id="L756">    m_RecalcHashCode = result;</span>
+
+<span class="fc" id="L758">    return result;</span>
+  }
+  
+  /**
+   * Returns the number of elements in this collection.
+   * 
+   * @return		the number of nodes in the tree
+   */
+  public int size() {
+<span class="fc" id="L767">    return m_Root.size();</span>
+  }
+  
+  /**
+   * Returns an array containing all of the elements in this collection.
+   * 
+   * @return		the stored strings as array
+   */
+  public Object[] toArray() {
+<span class="nc" id="L776">    return toArray(new String[0]);</span>
+  }
+  
+  /**
+   * Returns an array containing all of the elements in this collection; the 
+   * runtime type of the returned array is that of the specified array.
+   * 
+   * @param a		the array into which the elements of this collection 
+   * 			are to be stored
+   * @return		an array containing the elements of this collection
+   */
+  public &lt;T&gt; T[] toArray(T[] a) {
+    Object[]	result;
+    Iterator	iter;
+    Vector	list;
+    int		i;
+    
+<span class="nc" id="L793">    list = new Vector();</span>
+<span class="nc" id="L794">    iter = iterator();</span>
+<span class="nc bnc" id="L795" title="All 2 branches missed.">    while (iter.hasNext())</span>
+<span class="nc" id="L796">      list.add(iter.next());</span>
+    
+<span class="nc bnc" id="L798" title="All 2 branches missed.">    if (Array.getLength(a) != list.size())</span>
+<span class="nc" id="L799">      result = (Object[]) Array.newInstance(a.getClass().getComponentType(), list.size());</span>
+    else
+<span class="nc" id="L801">      result = a;</span>
+    
+<span class="nc bnc" id="L803" title="All 2 branches missed.">    for (i = 0; i &lt; list.size(); i++)</span>
+<span class="nc" id="L804">      result[i] = list.get(i);</span>
+    
+<span class="nc" id="L806">    return (T[]) result;</span>
+  }
+
+  /**
+   * returns the node as String
+   * 
+   * @param node	the node to turn into a string
+   * @return		the node as string
+   */
+  protected String toString(TrieNode node) {
+    StringBuffer	result;
+    int			i;
+    StringBuffer	indentation;
+    
+<span class="nc" id="L820">    result = new StringBuffer();</span>
+    
+    // indent the node
+<span class="nc" id="L823">    indentation = new StringBuffer();</span>
+<span class="nc bnc" id="L824" title="All 2 branches missed.">    for (i = 0; i &lt; node.getLevel(); i++)</span>
+<span class="nc" id="L825">      indentation.append(&quot; | &quot;);</span>
+<span class="nc" id="L826">    result.append(indentation.toString());</span>
+    
+    // add the node label
+<span class="nc bnc" id="L829" title="All 2 branches missed.">    if (node.getChar() == null)</span>
+<span class="nc" id="L830">      result.append(&quot;&lt;root&gt;&quot;);</span>
+<span class="nc bnc" id="L831" title="All 2 branches missed.">    else if (node.getChar() == TrieNode.STOP)</span>
+<span class="nc" id="L832">      result.append(&quot;STOP&quot;);</span>
+    else
+<span class="nc" id="L834">      result.append(&quot;'&quot; + node.getChar() + &quot;'&quot;);</span>
+<span class="nc" id="L835">    result.append(&quot;\n&quot;);</span>
+
+    // add the children
+<span class="nc bnc" id="L838" title="All 2 branches missed.">    for (i = 0; i &lt; node.getChildCount(); i++)</span>
+<span class="nc" id="L839">      result.append(toString((TrieNode) node.getChildAt(i)));</span>
+    
+<span class="nc" id="L841">    return result.toString();</span>
+  }
+  
+  /**
+   * returns the trie in string representation
+   * 
+   * @return		the trie as string
+   */
+  public String toString() {
+<span class="nc" id="L850">    return toString(m_Root);</span>
+  }
+  
+  /**
+   * Returns the revision string.
+   * 
+   * @return		the revision
+   */
+  public String getRevision() {
+<span class="nc" id="L859">    return RevisionUtils.extract(&quot;$Revision: 1.2 $&quot;);</span>
+  }
+  
+  /**
+   * Only for testing (prints the built Trie). Arguments are added to the Trie. 
+   * If not arguments provided then a few default strings are uses for building.
+   * 
+   * @param args	commandline arguments
+   */
+  public static void main(String[] args) {
+    String[] data;
+    
+<span class="nc bnc" id="L871" title="All 2 branches missed.">    if (args.length == 0) {</span>
+<span class="nc" id="L872">      data = new String[3];</span>
+<span class="nc" id="L873">      data[0] = &quot;this is a test&quot;;</span>
+<span class="nc" id="L874">      data[1] = &quot;this is another test&quot;;</span>
+<span class="nc" id="L875">      data[2] = &quot;and something else&quot;;</span>
+    }
+    else {
+<span class="nc" id="L878">      data = args.clone();</span>
+    }
+
+    // build trie
+<span class="nc" id="L882">    Trie t = new Trie();</span>
+<span class="nc bnc" id="L883" title="All 2 branches missed.">    for (int i = 0; i &lt; data.length; i++)</span>
+<span class="nc" id="L884">      t.add(data[i]);</span>
+<span class="nc" id="L885">    System.out.println(t);</span>
+<span class="nc" id="L886">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.6.201602180812</span></div></body></html>

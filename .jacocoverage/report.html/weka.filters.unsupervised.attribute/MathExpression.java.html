@@ -1,0 +1,569 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>MathExpression.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCoverage analysis of project &quot;Weka-3.6.10&quot; (powered by JaCoCo from EclEmma)</a> &gt; <a href="index.source.html" class="el_package">weka.filters.unsupervised.attribute</a> &gt; <span class="el_source">MathExpression.java</span></div><h1>MathExpression.java</h1><pre class="source lang-java linenums">/*
+ *    This program is free software; you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation; either version 2 of the License, or
+ *    (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with this program; if not, write to the Free Software
+ *    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
+
+/*
+ *    MathExpression.java
+ *    Copyright (C) 2004 Prados Julien
+ *    Copyright (C) 2002 University of Waikato, Hamilton, New Zealand
+ */
+
+package weka.filters.unsupervised.attribute;
+
+import weka.core.AttributeStats;
+import weka.core.Capabilities;
+import weka.core.Instance;
+import weka.core.Instances;
+import weka.core.MathematicalExpression;
+import weka.core.Option;
+import weka.core.Range;
+import weka.core.RevisionUtils;
+import weka.core.SparseInstance;
+import weka.core.Utils;
+import weka.core.Capabilities.Capability;
+import weka.core.mathematicalexpression.Parser;
+import weka.core.mathematicalexpression.Scanner;
+import java_cup.runtime.DefaultSymbolFactory;
+import java_cup.runtime.SymbolFactory;
+import weka.filters.UnsupervisedFilter;
+
+import java.io.ByteArrayInputStream;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Vector;
+
+/** 
+ &lt;!-- globalinfo-start --&gt;
+ * Modify numeric attributes according to a given expression
+ * &lt;p/&gt;
+ &lt;!-- globalinfo-end --&gt;
+ * 
+ &lt;!-- options-start --&gt;
+ * Valid options are: &lt;p/&gt;
+ * 
+ * &lt;pre&gt; -unset-class-temporarily
+ *  Unsets the class index temporarily before the filter is
+ *  applied to the data.
+ *  (default: no)&lt;/pre&gt;
+ * 
+ * &lt;pre&gt; -E &amp;lt;expression&amp;gt;
+ *  Specify the expression to apply. Eg. pow(A,6)/(MEAN+MAX)
+ *  Supported operators are +, -, *, /, pow, log,
+ *  abs, cos, exp, sqrt, tan, sin, ceil, floor, rint, (, ), 
+ *  MEAN, MAX, MIN, SD, COUNT, SUM, SUMSQUARED, ifelse&lt;/pre&gt;
+ * 
+ * &lt;pre&gt; -R &amp;lt;index1,index2-index4,...&amp;gt;
+ *  Specify list of columns to ignore. First and last are valid
+ *  indexes. (default none)&lt;/pre&gt;
+ * 
+ * &lt;pre&gt; -V
+ *  Invert matching sense (i.e. only modify specified columns)&lt;/pre&gt;
+ * 
+ &lt;!-- options-end --&gt;
+ *
+ * @author Eibe Frank (eibe@cs.waikato.ac.nz) 
+ * @author Prados Julien (julien.prados@cui.unige.ch) 
+ * @version $Revision: 5543 $
+ * @see MathematicalExpression
+ */
+public class MathExpression 
+  extends PotentialClassIgnorer 
+  implements UnsupervisedFilter {
+  
+  /** for serialization */
+  static final long serialVersionUID = -3713222714671997901L;
+  
+  /** Stores which columns to select as a funky range */
+<span class="fc" id="L89">  protected Range m_SelectCols = new Range();</span>
+    
+  /** The default modification expression */
+  public static final String m_defaultExpression = &quot;(A-MIN)/(MAX-MIN)&quot;;
+
+  /** The modification expression */
+<span class="fc" id="L95">  private String m_expression = m_defaultExpression;</span>
+  
+  /** Attributes statistics */
+  private AttributeStats[] m_attStats;
+  
+  /**
+   * Constructor
+   */
+  public MathExpression() {
+<span class="fc" id="L104">    super();</span>
+<span class="fc" id="L105">    setInvertSelection(false);</span>
+<span class="fc" id="L106">  }  </span>
+  
+  /**
+   * Returns a string describing this filter
+   *
+   * @return a description of the filter suitable for
+   * displaying in the explorer/experimenter gui
+   */
+  public String globalInfo() {
+
+<span class="nc" id="L116">    return &quot;Modify numeric attributes according to a given expression &quot;;</span>
+  }
+
+  /** 
+   * Returns the Capabilities of this filter.
+   *
+   * @return            the capabilities of this object
+   * @see               Capabilities
+   */
+  public Capabilities getCapabilities() {
+<span class="fc" id="L126">    Capabilities result = super.getCapabilities();</span>
+<span class="fc" id="L127">    result.disableAll();</span>
+
+    // attributes
+<span class="fc" id="L130">    result.enableAllAttributes();</span>
+<span class="fc" id="L131">    result.enable(Capability.MISSING_VALUES);</span>
+    
+    // class
+<span class="fc" id="L134">    result.enableAllClasses();</span>
+<span class="fc" id="L135">    result.enable(Capability.MISSING_CLASS_VALUES);</span>
+<span class="fc" id="L136">    result.enable(Capability.NO_CLASS);</span>
+    
+<span class="fc" id="L138">    return result;</span>
+  }
+  
+  /**
+   * Sets the format of the input instances.
+   *
+   * @param instanceInfo an Instances object containing the input 
+   * instance structure (any instances contained in the object are 
+   * ignored - only the structure is required).
+   * @return true if the outputFormat may be collected immediately
+   * @throws Exception if the input format can't be set 
+   * successfully
+   */
+  public boolean setInputFormat(Instances instanceInfo) 
+       throws Exception {
+<span class="fc" id="L153">    m_SelectCols.setUpper(instanceInfo.numAttributes() - 1);</span>
+<span class="fc" id="L154">    super.setInputFormat(instanceInfo);</span>
+<span class="fc" id="L155">    setOutputFormat(instanceInfo);</span>
+<span class="fc" id="L156">    m_attStats = null;</span>
+<span class="fc" id="L157">    return true;</span>
+  }
+
+  /**
+   * Input an instance for filtering. Filter requires all
+   * training instances be read before producing output.
+   *
+   * @param instance the input instance
+   * @return true if the filtered instance may now be
+   * collected with output().
+   * @throws IllegalStateException if no input format has been set.
+   */
+  public boolean input(Instance instance) throws Exception {
+
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">    if (getInputFormat() == null) {</span>
+<span class="nc" id="L172">      throw new IllegalStateException(&quot;No input instance format defined&quot;);</span>
+    }
+<span class="fc bfc" id="L174" title="All 2 branches covered.">    if (m_NewBatch) {</span>
+<span class="fc" id="L175">      resetQueue();</span>
+<span class="fc" id="L176">      m_NewBatch = false;</span>
+    }
+<span class="fc bfc" id="L178" title="All 2 branches covered.">    if (m_attStats == null) {</span>
+<span class="fc" id="L179">      bufferInput(instance);</span>
+<span class="fc" id="L180">      return false;</span>
+    } else {
+<span class="fc" id="L182">      convertInstance(instance);</span>
+<span class="fc" id="L183">      return true;</span>
+    }
+  }
+
+  /**
+   * Signify that this batch of input to the filter is finished. 
+   * If the filter requires all instances prior to filtering,
+   * output() may now be called to retrieve the filtered instances.
+   *
+   * @return true if there are instances pending output
+   * @throws IllegalStateException if no input structure has been defined
+   */
+  public boolean batchFinished() throws Exception {
+
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">    if (getInputFormat() == null) {</span>
+<span class="nc" id="L198">      throw new IllegalStateException(&quot;No input instance format defined&quot;);</span>
+    }
+<span class="fc bfc" id="L200" title="All 2 branches covered.">    if (m_attStats == null) {</span>
+<span class="fc" id="L201">      Instances input = getInputFormat();</span>
+
+<span class="fc" id="L203">      m_attStats = new AttributeStats [input.numAttributes()];</span>
+      
+<span class="fc bfc" id="L205" title="All 2 branches covered.">      for (int i = 0; i &lt; input.numAttributes(); i++) {</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">	if (input.attribute(i).isNumeric() &amp;&amp;</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">	    (input.classIndex() != i)) {</span>
+<span class="fc" id="L208">	  m_attStats[i] = input.attributeStats(i);</span>
+	}
+      }
+
+      // Convert pending input instances
+<span class="fc bfc" id="L213" title="All 2 branches covered.">      for(int i = 0; i &lt; input.numInstances(); i++) {</span>
+<span class="fc" id="L214">	convertInstance(input.instance(i));</span>
+      }
+    } 
+    // Free memory
+<span class="fc" id="L218">    flushInput();</span>
+
+<span class="fc" id="L220">    m_NewBatch = true;</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">    return (numPendingOutput() != 0);</span>
+  }
+  
+  /**
+   * Evaluates the symbols.
+   * 
+   * @param symbols 	the symbols to use for evaluation
+   * @return		the calculated value, Double.NaN in case of an error
+   */
+  protected double eval(HashMap symbols) {
+    SymbolFactory 		sf;
+    ByteArrayInputStream 	parserInput;
+    Parser 			parser;
+    double			result;
+    
+    try {
+<span class="fc" id="L237">      sf          = new DefaultSymbolFactory();</span>
+<span class="fc" id="L238">      parserInput = new ByteArrayInputStream(m_expression.getBytes());</span>
+<span class="fc" id="L239">      parser      = new Parser(new Scanner(parserInput, sf), sf);</span>
+<span class="fc" id="L240">      parser.setSymbols(symbols);</span>
+<span class="fc" id="L241">      parser.parse();</span>
+<span class="fc" id="L242">      result = parser.getResult();</span>
+    }
+<span class="nc" id="L244">    catch (Exception e) {</span>
+<span class="nc" id="L245">      result = Double.NaN;</span>
+<span class="nc" id="L246">      e.printStackTrace();</span>
+<span class="fc" id="L247">    }</span>
+    
+<span class="fc" id="L249">    return result;</span>
+  }
+  
+  /**
+   * Convert a single instance over. The converted instance is 
+   * added to the end of the output queue.
+   *
+   * @param instance the instance to convert
+   * @throws Exception if instance cannot be converted
+   */
+  private void convertInstance(Instance instance) throws Exception {
+  
+<span class="fc" id="L261">    Instance inst = null;</span>
+<span class="fc" id="L262">    HashMap symbols = new HashMap(5);</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">    if (instance instanceof SparseInstance) {</span>
+<span class="fc" id="L264">      double[] newVals = new double[instance.numAttributes()];</span>
+<span class="fc" id="L265">      int[] newIndices = new int[instance.numAttributes()];</span>
+<span class="fc" id="L266">      double[] vals = instance.toDoubleArray();</span>
+<span class="fc" id="L267">      int ind = 0;</span>
+      double value;
+<span class="fc bfc" id="L269" title="All 2 branches covered.">      for (int j = 0; j &lt; instance.numAttributes(); j++) {</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">        if (m_SelectCols.isInRange(j)) {          </span>
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">	  if (instance.attribute(j).isNumeric() &amp;&amp;</span>
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">	    (!Instance.isMissingValue(vals[j])) &amp;&amp;</span>
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">	    (getInputFormat().classIndex() != j)) {</span>
+<span class="fc" id="L274">              symbols.put(&quot;A&quot;, new Double(vals[j]));  </span>
+<span class="fc" id="L275">              symbols.put(&quot;MAX&quot;, new Double(m_attStats[j].numericStats.max));</span>
+<span class="fc" id="L276">              symbols.put(&quot;MIN&quot;, new Double(m_attStats[j].numericStats.min));</span>
+<span class="fc" id="L277">              symbols.put(&quot;MEAN&quot;, new Double(m_attStats[j].numericStats.mean));</span>
+<span class="fc" id="L278">              symbols.put(&quot;SD&quot;, new Double(m_attStats[j].numericStats.stdDev));</span>
+<span class="fc" id="L279">              symbols.put(&quot;COUNT&quot;, new Double(m_attStats[j].numericStats.count));</span>
+<span class="fc" id="L280">              symbols.put(&quot;SUM&quot;, new Double(m_attStats[j].numericStats.sum));</span>
+<span class="fc" id="L281">              symbols.put(&quot;SUMSQUARED&quot;, new Double(m_attStats[j].numericStats.sumSq));</span>
+<span class="fc" id="L282">              value = eval(symbols);</span>
+<span class="pc bpc" id="L283" title="1 of 4 branches missed.">              if (Double.isNaN(value) || Double.isInfinite(value)) {</span>
+<span class="fc" id="L284">                  System.err.println(&quot;WARNING:Error in evaluating the expression: missing value set&quot;);</span>
+<span class="fc" id="L285">                  value = Instance.missingValue();</span>
+              }
+<span class="fc bfc" id="L287" title="All 2 branches covered.">	      if (value != 0.0) {</span>
+<span class="fc" id="L288">	        newVals[ind] = value;</span>
+<span class="fc" id="L289">	        newIndices[ind] = j;</span>
+<span class="fc" id="L290">	        ind++;</span>
+	      }
+	      
+	  }
+        } else {
+<span class="fc" id="L295">          value = vals[j];</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">          if (value != 0.0) {</span>
+<span class="fc" id="L297">            newVals[ind] = value;</span>
+<span class="fc" id="L298">            newIndices[ind] = j;</span>
+<span class="fc" id="L299">            ind++;</span>
+          }
+        }
+      }	
+<span class="fc" id="L303">      double[] tempVals = new double[ind];</span>
+<span class="fc" id="L304">      int[] tempInd = new int[ind];</span>
+<span class="fc" id="L305">      System.arraycopy(newVals, 0, tempVals, 0, ind);</span>
+<span class="fc" id="L306">      System.arraycopy(newIndices, 0, tempInd, 0, ind);</span>
+<span class="fc" id="L307">      inst = new SparseInstance(instance.weight(), tempVals, tempInd,</span>
+<span class="fc" id="L308">                                instance.numAttributes());</span>
+<span class="fc" id="L309">    } else {</span>
+<span class="fc" id="L310">      double[] vals = instance.toDoubleArray();</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">      for (int j = 0; j &lt; getInputFormat().numAttributes(); j++) {</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">        if (m_SelectCols.isInRange(j)) {</span>
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">	  if (instance.attribute(j).isNumeric() &amp;&amp;</span>
+<span class="pc bpc" id="L314" title="1 of 2 branches missed.">	      (!Instance.isMissingValue(vals[j])) &amp;&amp;</span>
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">	      (getInputFormat().classIndex() != j)) {</span>
+<span class="fc" id="L316">              symbols.put(&quot;A&quot;, new Double(vals[j]));  </span>
+<span class="fc" id="L317">              symbols.put(&quot;MAX&quot;, new Double(m_attStats[j].numericStats.max));</span>
+<span class="fc" id="L318">              symbols.put(&quot;MIN&quot;, new Double(m_attStats[j].numericStats.min));</span>
+<span class="fc" id="L319">              symbols.put(&quot;MEAN&quot;, new Double(m_attStats[j].numericStats.mean));</span>
+<span class="fc" id="L320">              symbols.put(&quot;SD&quot;, new Double(m_attStats[j].numericStats.stdDev));</span>
+<span class="fc" id="L321">              symbols.put(&quot;COUNT&quot;, new Double(m_attStats[j].numericStats.count));</span>
+<span class="fc" id="L322">              symbols.put(&quot;SUM&quot;, new Double(m_attStats[j].numericStats.sum));</span>
+<span class="fc" id="L323">              symbols.put(&quot;SUMSQUARED&quot;, new Double(m_attStats[j].numericStats.sumSq));</span>
+<span class="fc" id="L324">              vals[j] = eval(symbols);</span>
+<span class="pc bpc" id="L325" title="2 of 4 branches missed.">              if (Double.isNaN(vals[j]) || Double.isInfinite(vals[j])) {</span>
+<span class="nc" id="L326">                  System.err.println(&quot;WARNING:Error in Evaluation the Expression: missing value set&quot;);</span>
+<span class="nc" id="L327">                  vals[j] = Instance.missingValue();</span>
+              }
+	  }
+        }
+      }
+<span class="fc" id="L332">      inst = new Instance(instance.weight(), vals);</span>
+    }
+<span class="fc" id="L334">    inst.setDataset(instance.dataset());</span>
+<span class="fc" id="L335">    push(inst);</span>
+<span class="fc" id="L336">  }</span>
+
+  /**
+   * Parses a given list of options. &lt;p/&gt;
+   * 
+   &lt;!-- options-start --&gt;
+   * Valid options are: &lt;p/&gt;
+   * 
+   * &lt;pre&gt; -unset-class-temporarily
+   *  Unsets the class index temporarily before the filter is
+   *  applied to the data.
+   *  (default: no)&lt;/pre&gt;
+   * 
+   * &lt;pre&gt; -E &amp;lt;expression&amp;gt;
+   *  Specify the expression to apply. Eg. pow(A,6)/(MEAN+MAX)
+   *  Supported operators are +, -, *, /, pow, log,
+   *  abs, cos, exp, sqrt, tan, sin, ceil, floor, rint, (, ), 
+   *  MEAN, MAX, MIN, SD, COUNT, SUM, SUMSQUARED, ifelse&lt;/pre&gt;
+   * 
+   * &lt;pre&gt; -R &amp;lt;index1,index2-index4,...&amp;gt;
+   *  Specify list of columns to ignore. First and last are valid
+   *  indexes. (default none)&lt;/pre&gt;
+   * 
+   * &lt;pre&gt; -V
+   *  Invert matching sense (i.e. only modify specified columns)&lt;/pre&gt;
+   * 
+   &lt;!-- options-end --&gt;
+   *
+   * @param options the list of options as an array of strings
+   * @throws Exception if an option is not supported
+   */
+  public void setOptions(String[] options) throws Exception {
+<span class="fc" id="L368">    super.setOptions(options);</span>
+
+<span class="fc" id="L370">    String expString = Utils.getOption('E', options);</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">    if (expString.length() != 0) {</span>
+<span class="fc" id="L372">      setExpression(expString);</span>
+    } else {
+<span class="fc" id="L374">      setExpression(m_defaultExpression);</span>
+    }
+    
+<span class="fc" id="L377">    String ignoreList = Utils.getOption('R', options);</span>
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">    if (ignoreList.length() != 0) {</span>
+<span class="nc" id="L379">      setIgnoreRange(ignoreList);</span>
+    }
+
+<span class="fc" id="L382">    setInvertSelection(Utils.getFlag('V', options));</span>
+<span class="fc" id="L383">  }</span>
+  
+  /**
+   * Gets the current settings of the filter.
+   *
+   * @return an array of strings suitable for passing to setOptions
+   */
+  public String [] getOptions() {
+    Vector        result;
+    String[]      options;
+    int           i;
+
+<span class="fc" id="L395">    result = new Vector();</span>
+
+<span class="fc" id="L397">    options = super.getOptions();</span>
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">    for (i = 0; i &lt; options.length; i++)</span>
+<span class="nc" id="L399">      result.add(options[i]);</span>
+
+<span class="fc" id="L401">    result.add(&quot;-E&quot;);</span>
+<span class="fc" id="L402">    result.add(getExpression());</span>
+    
+<span class="fc bfc" id="L404" title="All 2 branches covered.">    if (getInvertSelection())</span>
+<span class="fc" id="L405">      result.add(&quot;-V&quot;);</span>
+
+<span class="fc bfc" id="L407" title="All 2 branches covered.">    if (!getIgnoreRange().equals(&quot;&quot;)) {</span>
+<span class="fc" id="L408">      result.add(&quot;-R&quot;);</span>
+<span class="fc" id="L409">      result.add(getIgnoreRange());</span>
+    }
+
+<span class="fc" id="L412">    return (String[]) result.toArray(new String[result.size()]);</span>
+  }
+  
+  /**
+   * Returns an enumeration describing the available options.
+   *
+   * @return an enumeration of all the available options.
+   */
+  public Enumeration listOptions() {
+<span class="fc" id="L421">    Vector result = new Vector();</span>
+<span class="fc" id="L422">    Enumeration enm = super.listOptions();</span>
+<span class="fc bfc" id="L423" title="All 2 branches covered.">    while (enm.hasMoreElements())</span>
+<span class="fc" id="L424">      result.add(enm.nextElement());</span>
+      
+<span class="fc" id="L426">    result.addElement(new Option(</span>
+	&quot;\tSpecify the expression to apply. Eg. pow(A,6)/(MEAN+MAX)&quot;
+	+&quot;\n\tSupported operators are +, -, *, /, pow, log,&quot;
+	+&quot;\n\tabs, cos, exp, sqrt, tan, sin, ceil, floor, rint, (, ), &quot;
+	+&quot;\n\tMEAN, MAX, MIN, SD, COUNT, SUM, SUMSQUARED, ifelse&quot;,
+	&quot;E&quot;,1,&quot;-E &lt;expression&gt;&quot;));
+    
+<span class="fc" id="L433">    result.addElement(new Option(</span>
+	&quot;\tSpecify list of columns to ignore. First and last are valid\n&quot;
+	+&quot;\tindexes. (default none)&quot;,
+	&quot;R&quot;, 1, &quot;-R &lt;index1,index2-index4,...&gt;&quot;));
+    
+<span class="fc" id="L438">    result.addElement(new Option(</span>
+	&quot;\tInvert matching sense (i.e. only modify specified columns)&quot;,
+	&quot;V&quot;, 0, &quot;-V&quot;));
+    
+<span class="fc" id="L442">    return result.elements();</span>
+  }
+  
+  /**
+   * Returns the tip text for this property
+   *
+   * @return tip text for this property suitable for
+   * displaying in the explorer/experimenter gui
+   */
+  public String expressionTipText() {
+<span class="nc" id="L452">    return &quot;Specify the expression to apply. The 'A' letter&quot;</span>
+             + &quot;refers to the attribute value. MIN,MAX,MEAN,SD&quot;
+             + &quot;refer respectively to minimum, maximum, mean and&quot;
+             + &quot;standard deviation of the attribute.&quot;
+	     +&quot;\n\tSupported operators are +, -, *, /, pow, log,&quot;
+             +&quot;abs, cos, exp, sqrt, tan, sin, ceil, floor, rint, (, ),&quot;
+             +&quot;A,MEAN, MAX, MIN, SD, COUNT, SUM, SUMSQUARED, ifelse&quot;
+             +&quot;\n\tEg. pow(A,6)/(MEAN+MAX)*ifelse(A&lt;0,0,sqrt(A))+ifelse(![A&gt;9 &amp;&amp; A&lt;15])&quot;;
+  }
+  
+  /**
+   * Set the expression to apply
+   * @param expr a mathematical expression to apply
+   */
+  public void setExpression(String expr) {
+<span class="fc" id="L467">    m_expression = expr;</span>
+<span class="fc" id="L468">  }</span>
+
+  /**
+   * Get the expression
+   * @return the expression
+   */
+  public String getExpression() {
+<span class="fc" id="L475">    return m_expression;</span>
+  }
+  
+    /**
+   * Returns the tip text for this property
+   *
+   * @return tip text for this property suitable for
+   * displaying in the explorer/experimenter gui
+   */
+  public String invertSelectionTipText() {
+
+<span class="nc" id="L486">    return &quot;Determines whether action is to select or unselect.&quot;</span>
+      + &quot; If set to true, only the specified attributes will be modified;&quot;
+      + &quot; If set to false, specified attributes will not be modified.&quot;;
+  }
+
+  /**
+   * Get whether the supplied columns are to be select or unselect
+   *
+   * @return true if the supplied columns will be kept
+   */
+  public boolean getInvertSelection() {
+
+<span class="fc bfc" id="L498" title="All 2 branches covered.">    return !m_SelectCols.getInvert();</span>
+  }
+
+  /**
+   * Set whether selected columns should be select or unselect. If true the 
+   * selected columns are modified. If false the selected columns are not
+   * modified.
+   *
+   * @param invert the new invert setting
+   */
+  public void setInvertSelection(boolean invert) {
+
+<span class="fc bfc" id="L510" title="All 2 branches covered.">    m_SelectCols.setInvert(!invert);</span>
+<span class="fc" id="L511">  }</span>
+
+  /**
+   * Returns the tip text for this property
+   *
+   * @return tip text for this property suitable for
+   * displaying in the explorer/experimenter gui
+   */
+  public String ignoreRangeTipText() {
+
+<span class="nc" id="L521">    return &quot;Specify range of attributes to act on.&quot;</span>
+      + &quot; This is a comma separated list of attribute indices, with&quot;
+      + &quot; \&quot;first\&quot; and \&quot;last\&quot; valid values. Specify an inclusive&quot;
+      + &quot; range with \&quot;-\&quot;. E.g: \&quot;first-3,5,6-10,last\&quot;.&quot;;
+  }
+
+  /**
+   * Get the current range selection.
+   *
+   * @return a string containing a comma separated list of ranges
+   */
+  public String getIgnoreRange() {
+
+<span class="fc" id="L534">    return m_SelectCols.getRanges();</span>
+  }
+
+  /**
+   * Set which attributes are to be ignored
+   *
+   * @param rangeList a string representing the list of attributes.  Since
+   * the string will typically come from a user, attributes are indexed from
+   * 1. &lt;br/&gt;
+   * eg: first-3,5,6-last
+   */
+  public void setIgnoreRange(String rangeList) {
+
+<span class="fc" id="L547">    m_SelectCols.setRanges(rangeList);</span>
+<span class="fc" id="L548">  }</span>
+  
+  /**
+   * Returns the revision string.
+   * 
+   * @return		the revision
+   */
+  public String getRevision() {
+<span class="nc" id="L556">    return RevisionUtils.extract(&quot;$Revision: 5543 $&quot;);</span>
+  }
+  
+  /**
+   * Main method for testing this class.
+   *
+   * @param argv should contain arguments to the filter: 
+   * use -h for help
+   */
+  public static void main(String [] argv) {
+<span class="nc" id="L566">    runFilter(new MathExpression(), argv);</span>
+<span class="nc" id="L567">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.6.201602180812</span></div></body></html>

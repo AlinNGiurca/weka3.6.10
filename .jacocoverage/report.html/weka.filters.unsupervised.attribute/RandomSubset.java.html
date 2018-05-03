@@ -1,0 +1,381 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>RandomSubset.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCoverage analysis of project &quot;Weka-3.6.10&quot; (powered by JaCoCo from EclEmma)</a> &gt; <a href="index.source.html" class="el_package">weka.filters.unsupervised.attribute</a> &gt; <span class="el_source">RandomSubset.java</span></div><h1>RandomSubset.java</h1><pre class="source lang-java linenums">/*
+ *    This program is free software; you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation; either version 2 of the License, or
+ *    (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with this program; if not, write to the Free Software
+ *    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
+
+/*
+ * RandomSubset.java
+ * Copyright (C) 2007 University of Waikato, Hamilton, New Zealand
+ */
+
+package weka.filters.unsupervised.attribute;
+
+import weka.core.Capabilities;
+import weka.core.FastVector;
+import weka.core.Instance;
+import weka.core.Instances;
+import weka.core.Option;
+import weka.core.RevisionUtils;
+import weka.core.Utils;
+import weka.core.Capabilities.Capability;
+import weka.filters.SimpleStreamFilter;
+
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.Random;
+import java.util.Vector;
+
+/**
+ &lt;!-- globalinfo-start --&gt;
+ * Chooses a random subset of attributes, either an absolute number or a percentage. The class is always included in the output (as the last attribute).
+ * &lt;p/&gt;
+ &lt;!-- globalinfo-end --&gt;
+ * 
+ &lt;!-- options-start --&gt;
+ * Valid options are: &lt;p/&gt;
+ * 
+ * &lt;pre&gt; -D
+ *  Turns on output of debugging information.&lt;/pre&gt;
+ * 
+ * &lt;pre&gt; -N &amp;lt;double&amp;gt;
+ *  The number of attributes to randomly select.
+ *  If &amp;lt; 1 then percentage, &amp;gt;= 1 absolute number.
+ *  (default: 0.5)&lt;/pre&gt;
+ * 
+ * &lt;pre&gt; -S &amp;lt;int&amp;gt;
+ *  The seed value.
+ *  (default: 1)&lt;/pre&gt;
+ * 
+ &lt;!-- options-end --&gt;
+ *
+ * @author  fracpete (fracpete at waikato dot ac dot nz)
+ * @version $Revision: 5547 $
+ */
+<span class="fc" id="L65">public class RandomSubset</span>
+  extends SimpleStreamFilter {
+
+  /** for serialization. */
+  private static final long serialVersionUID = 2911221724251628050L;
+
+  /** The number of attributes to randomly choose (&amp;gt;= 1 absolute number of
+   * attributes, &amp;lt; 1 percentage). */
+<span class="fc" id="L73">  protected double m_NumAttributes = 0.5;</span>
+  
+  /** The seed value. */
+<span class="fc" id="L76">  protected int m_Seed = 1;</span>
+  
+  /** The indices of the attributes that got selected. */
+<span class="fc" id="L79">  protected int[] m_Indices = null;</span>
+  
+  /**
+   * Returns a string describing this filter.
+   *
+   * @return 		a description of the filter suitable for
+   * 			displaying in the explorer/experimenter gui
+   */
+  public String globalInfo() {
+<span class="nc" id="L88">    return </span>
+        &quot;Chooses a random subset of attributes, either an absolute number &quot;
+      + &quot;or a percentage. The class is always included in the output (&quot;
+      + &quot;as the last attribute).&quot;;
+  }
+
+  /**
+   * Returns an enumeration describing the available options.
+   *
+   * @return an enumeration of all the available options.
+   */
+  public Enumeration listOptions() {
+    Vector        result;
+    Enumeration   enm;
+
+<span class="fc" id="L103">    result = new Vector();</span>
+
+<span class="fc" id="L105">    enm = super.listOptions();</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">    while (enm.hasMoreElements())</span>
+<span class="fc" id="L107">      result.addElement(enm.nextElement());</span>
+
+<span class="fc" id="L109">    result.addElement(new Option(</span>
+	&quot;\tThe number of attributes to randomly select.\n&quot;
+	+ &quot;\tIf &lt; 1 then percentage, &gt;= 1 absolute number.\n&quot;
+	+ &quot;\t(default: 0.5)&quot;,
+	&quot;N&quot;, 1, &quot;-N &lt;double&gt;&quot;));
+    
+<span class="fc" id="L115">    result.addElement(new Option(</span>
+	&quot;\tThe seed value.\n&quot;
+	+ &quot;\t(default: 1)&quot;,
+	&quot;S&quot;, 1, &quot;-S &lt;int&gt;&quot;));
+
+<span class="fc" id="L120">    return result.elements();</span>
+  }	  
+
+  /**
+   * Gets the current settings of the filter.
+   *
+   * @return an array of strings suitable for passing to setOptions
+   */
+  public String[] getOptions() {
+    int			i;
+    Vector&lt;String&gt;	result;
+    String[]		options;
+
+<span class="fc" id="L133">    result  = new Vector&lt;String&gt;();</span>
+<span class="fc" id="L134">    options = super.getOptions();</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">    for (i = 0; i &lt; options.length; i++)</span>
+<span class="nc" id="L136">      result.add(options[i]);</span>
+
+<span class="fc" id="L138">    result.add(&quot;-N&quot;); </span>
+<span class="fc" id="L139">    result.add(&quot;&quot; + m_NumAttributes);</span>
+
+<span class="fc" id="L141">    result.add(&quot;-S&quot;); </span>
+<span class="fc" id="L142">    result.add(&quot;&quot; + m_Seed);</span>
+
+<span class="fc" id="L144">    return result.toArray(new String[result.size()]);	  </span>
+  }	  
+
+  /**
+   * Parses a given list of options. &lt;p/&gt;
+   *
+   &lt;!-- options-start --&gt;
+   * Valid options are: &lt;p/&gt;
+   * 
+   * &lt;pre&gt; -D
+   *  Turns on output of debugging information.&lt;/pre&gt;
+   * 
+   * &lt;pre&gt; -N &amp;lt;double&amp;gt;
+   *  The number of attributes to randomly select.
+   *  If &amp;lt; 1 then percentage, &amp;gt;= 1 absolute number.
+   *  (default: 0.5)&lt;/pre&gt;
+   * 
+   * &lt;pre&gt; -S &amp;lt;int&amp;gt;
+   *  The seed value.
+   *  (default: 1)&lt;/pre&gt;
+   * 
+   &lt;!-- options-end --&gt;
+   * 
+   * @param options the list of options as an array of strings
+   * @throws Exception if an option is not supported 
+   */
+  public void setOptions(String[] options) throws Exception {
+    String	tmpStr;
+
+<span class="fc" id="L173">    tmpStr = Utils.getOption(&quot;N&quot;, options);</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">    if (tmpStr.length() != 0)</span>
+<span class="fc" id="L175">      setNumAttributes(Double.parseDouble(tmpStr));</span>
+    else
+<span class="fc" id="L177">      setNumAttributes(0.5);</span>
+    
+<span class="fc" id="L179">    tmpStr = Utils.getOption(&quot;S&quot;, options);</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">    if (tmpStr.length() != 0)</span>
+<span class="fc" id="L181">      setSeed(Integer.parseInt(tmpStr));</span>
+    else
+<span class="fc" id="L183">      setSeed(1);</span>
+    
+<span class="fc" id="L185">    super.setOptions(options);</span>
+<span class="fc" id="L186">  }	  </span>
+
+  /**
+   * Returns the tip text for this property.
+   * 
+   * @return 		tip text for this property suitable for
+   * 			displaying in the explorer/experimenter gui
+   */
+  public String numAttributesTipText() {
+<span class="nc" id="L195">    return &quot;The number of attributes to choose: &lt; 1 percentage, &gt;= 1 absolute number.&quot;;</span>
+  }
+
+  /**
+   * Get the number of attributes (&amp;lt; 1 percentage, &amp;gt;= 1 absolute number).
+   *
+   * @return 		the number of attributes.
+   */
+  public double getNumAttributes() {
+<span class="nc" id="L204">    return m_NumAttributes;</span>
+  }
+
+  /**
+   * Set the number of attributes. 
+   *
+   * @param value	the number of attributes to use.
+   */
+  public void setNumAttributes(double value) {
+<span class="fc" id="L213">    m_NumAttributes = value;</span>
+<span class="fc" id="L214">  }</span>
+
+  /**
+   * Returns the tip text for this property.
+   * 
+   * @return 		tip text for this property suitable for
+   * 			displaying in the explorer/experimenter gui
+   */
+  public String seedTipText() {
+<span class="nc" id="L223">    return &quot;The seed value for the random number generator.&quot;;</span>
+  }
+
+  /**
+   * Get the seed value for the random number generator.
+   *
+   * @return 		the seed value.
+   */
+  public int getSeed() {
+<span class="nc" id="L232">    return m_Seed;</span>
+  }
+
+  /**
+   * Set the seed value for the random number generator. 
+   *
+   * @param value	the seed value.
+   */
+  public void setSeed(int value) {
+<span class="fc" id="L241">    m_Seed = value;</span>
+<span class="fc" id="L242">  }</span>
+
+  /** 
+   * Returns the Capabilities of this filter.
+   *
+   * @return            the capabilities of this object
+   * @see               Capabilities
+   */
+  public Capabilities getCapabilities() {
+<span class="fc" id="L251">    Capabilities result = super.getCapabilities();</span>
+<span class="fc" id="L252">    result.disableAll();</span>
+
+    // attributes
+<span class="fc" id="L255">    result.enableAllAttributes();</span>
+<span class="fc" id="L256">    result.enable(Capability.MISSING_VALUES);</span>
+    
+    // class
+<span class="fc" id="L259">    result.enableAllClasses();</span>
+<span class="fc" id="L260">    result.enable(Capability.MISSING_CLASS_VALUES);</span>
+<span class="fc" id="L261">    result.enable(Capability.NO_CLASS);</span>
+    
+<span class="fc" id="L263">    return result;</span>
+  }
+
+  /**
+   * Determines the output format based on the input format and returns 
+   * this. In case the output format cannot be returned immediately, i.e.,
+   * hasImmediateOutputFormat() returns false, then this method will called
+   * from batchFinished() after the call of preprocess(Instances), in which,
+   * e.g., statistics for the actual processing step can be gathered.
+   *
+   * @param inputFormat     the input format to base the output format on
+   * @return                the output format
+   * @throws Exception      in case the determination goes wrong
+   */
+  protected Instances determineOutputFormat(Instances inputFormat) throws Exception {
+    Instances		result;
+    FastVector		atts;
+    int			i;
+    int			numAtts;
+    Vector&lt;Integer&gt;	indices;
+    Vector&lt;Integer&gt;	subset;
+    Random		rand;
+    int			index;
+ 
+    // determine the number of attributes
+<span class="fc" id="L288">    numAtts = inputFormat.numAttributes();</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">    if (inputFormat.classIndex() &gt; -1)</span>
+<span class="fc" id="L290">      numAtts--;</span>
+    
+<span class="fc bfc" id="L292" title="All 2 branches covered.">    if (m_NumAttributes &lt; 1) {</span>
+<span class="fc" id="L293">      numAtts = (int) Math.round((double) numAtts * m_NumAttributes);</span>
+    }
+    else {
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">      if (m_NumAttributes &lt; numAtts)</span>
+<span class="fc" id="L297">	numAtts = (int) m_NumAttributes;</span>
+    }
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">    if (getDebug())</span>
+<span class="nc" id="L300">      System.out.println(&quot;# of atts: &quot; + numAtts);</span>
+    
+    // determine random indices
+<span class="fc" id="L303">    indices = new Vector&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">    for (i = 0; i &lt; inputFormat.numAttributes(); i++) {</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">      if (i == inputFormat.classIndex())</span>
+<span class="fc" id="L306">	continue;</span>
+<span class="fc" id="L307">      indices.add(i);</span>
+    }
+    
+<span class="fc" id="L310">    subset = new Vector&lt;Integer&gt;();</span>
+<span class="fc" id="L311">    rand   = new Random(m_Seed);</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">    for (i = 0; i &lt; numAtts; i++) {</span>
+<span class="fc" id="L313">      index = rand.nextInt(indices.size());</span>
+<span class="fc" id="L314">      subset.add(indices.get(index));</span>
+<span class="fc" id="L315">      indices.remove(index);</span>
+    }
+<span class="fc" id="L317">    Collections.sort(subset);</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">    if (inputFormat.classIndex() &gt; -1)</span>
+<span class="fc" id="L319">      subset.add(inputFormat.classIndex());</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">    if (getDebug())</span>
+<span class="nc" id="L321">      System.out.println(&quot;indices: &quot; + subset);</span>
+    
+    // generate output format
+<span class="fc" id="L324">    atts      = new FastVector();</span>
+<span class="fc" id="L325">    m_Indices = new int[subset.size()];</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">    for (i = 0; i &lt; subset.size(); i++) {</span>
+<span class="fc" id="L327">      atts.addElement(inputFormat.attribute(subset.get(i)));</span>
+<span class="fc" id="L328">      m_Indices[i] = subset.get(i);</span>
+    }
+<span class="fc" id="L330">    result = new Instances(inputFormat.relationName(), atts, 0);</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">    if (inputFormat.classIndex() &gt; -1)</span>
+<span class="fc" id="L332">      result.setClassIndex(result.numAttributes() - 1);</span>
+
+<span class="fc" id="L334">    return result;</span>
+  }
+
+  /**
+   * processes the given instance (may change the provided instance) and
+   * returns the modified version.
+   *
+   * @param instance    the instance to process
+   * @return            the modified data
+   * @throws Exception  in case the processing goes wrong
+   */
+  protected Instance process(Instance instance) throws Exception {
+    Instance	result;
+    double[]	values;
+    int		i;
+    
+<span class="fc" id="L350">    values = new double[m_Indices.length];</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">    for (i = 0; i &lt; m_Indices.length; i++)</span>
+<span class="fc" id="L352">      values[i] = instance.value(m_Indices[i]);</span>
+
+<span class="fc" id="L354">    result = new Instance(instance.weight(), values);</span>
+<span class="fc" id="L355">    result.setDataset(getOutputFormat());</span>
+    
+<span class="fc" id="L357">    copyValues(result, false, instance.dataset(), getOutputFormat());</span>
+<span class="fc" id="L358">    result.setDataset(getOutputFormat());</span>
+    
+<span class="fc" id="L360">    return result;</span>
+  }
+  
+  /**
+   * Returns the revision string.
+   * 
+   * @return		the revision
+   */
+  public String getRevision() {
+<span class="nc" id="L369">    return RevisionUtils.extract(&quot;$Revision: 5547 $&quot;);</span>
+  }
+
+  /**
+   * Runs the filter with the given parameters. Use -h to list options.
+   * 
+   * @param args	the commandline options
+   */
+  public static void main(String[] args) {
+<span class="nc" id="L378">    runFilter(new RandomSubset(), args);</span>
+<span class="nc" id="L379">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.6.201602180812</span></div></body></html>
